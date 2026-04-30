@@ -7,10 +7,9 @@
 #include <sys/socket.h> //Defines core socket functions and constants.
 #include <netinet/in.h> //Defines Internet address structures.
 #define PORT 8080       // Port number
-#define IP_ADDY "127.0.0.1"
+#define IP_ADDY "127.0.0.1" // Defining the local host ip address 
 
-int udp_client()
-{
+int udp_client() {
     /*struct sockaddr_in {
     short sin_family; // e.g. AF_INET
     unsigned short sin_port; // e.g. htons(3490)
@@ -20,12 +19,11 @@ int udp_client()
     int sockfd;
     struct sockaddr_in server_addr;
     socklen_t addr_len = sizeof(server_addr);
-    char buffer[2056];
-    char message[2056];
+    char buffer[1024] = {0};
     int indefinitely = 1;
 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
+    if (sockfd == -1) {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
@@ -39,25 +37,20 @@ int udp_client()
     }
 
     while (indefinitely) {
-        memset(buffer, 0, sizeof(buffer));
-
         printf("Enter message you want to send(or type STOP to stop): ");
-        fgets(message, sizeof(message), stdin);
+        fgets(buffer, sizeof(buffer), stdin);
 
-        // remove newline
-        message[strcspn(message, "\n")] = 0;
-
-        if (strcmp(message, "STOP") == 0) {
+        if (strcmp(buffer, "STOP") == 0) {
             break;
         }
 
-        sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)&server_addr, addr_len);
+        sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, addr_len);
 
         recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
 
         printf("Server: %s\n", buffer);
     }
-
+    // Closing connections 
     close(sockfd);
     return 0;
 }
