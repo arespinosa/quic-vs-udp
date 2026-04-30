@@ -6,6 +6,8 @@
 #include <sys/socket.h> //Defines core socket functions and constants.
 #include <netinet/in.h> //Defines Internet address structures.
 #include <sys/time.h> // Allows me to measure time in milliseconds 
+#include <stdbool.h>
+
 
 #define PORT 8080 // Port number 
 
@@ -14,11 +16,25 @@
  */
 int udp_server() {
     // // Creating the header struct that will contain seq num and timestamp for each packet
-    // struct packet_headers
-    // {
-    //     int seq_num;
-    //     double time_stamp;
-    // };
+    struct metric_headers {
+        int seq_num;
+        double time_stamp;
+        int bytes_sent;
+    };
+
+    struct metric_headers header;
+    int i = 0;
+    int totalPackets;
+    int totalBytes = 0;
+    int packetsRec = 0;
+    char message[1024] = {0};
+    struct timeval tv;
+    double startTime;
+    double endTime;
+
+    // Variables that will help with analysis 
+    bool correctOrder = true;
+    bool lostPackets = false;
 
     // server_fd is the server's listening socket.
     int server_fd;
@@ -54,7 +70,12 @@ int udp_server() {
 
     // Making the server run indefinitely to process multiple messages
     int indefinitely = 1;
-
+    // Starting the time of when the server began listening 
+    gettimeofday(&tv, NULL);
+    double seconds = tv.tv_sec;
+    double ms = tv.tv_usec / 1000000.00;
+    startTime = seconds + ms;
+    
     while (indefinitely) {
         // Updating size of clientLen since message will be different every time 
         socklen_t clientLen = sizeof(client_address);
@@ -73,22 +94,72 @@ int udp_server() {
             perror("Package Recieve Failed");
             exit(EXIT_FAILURE);
         }
+        
+
+        memcpy(&header, buffer, sizeof(header));
+        // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
+        int msgBytes = receive - sizeof(header);
+
+        // Copying the buffer into the message with size of msgBytes
+        memcpy(message, buffer + sizeof(header), msgBytes);
+        // Assigning a null terminator to get only the message 
+        message[msgBytes] = '\0'; 
+
+        if(header.seq_num == -1) {
+            printf("------------------------------- \n");
+            printf("Anaylsis of Messages Sent \n");
+            // Metric 1: Order of packets 
+            if(correctOrder){
+                printf("Packets were receieved in order \n");
+            }
+            else{
+                printf("Packets were received in the wrong order \n");
+            }
+            // Metric 2: Packet Loss Detection 
+            if(header.bytes_sent == packetsRec) {
+                printf("No Packets were lost! \n");
+            }
+            else {
+                double lostPercentage = (double)packetsRec / header.bytes_sent;
+                printf("Loss Percentage: %.3f", lostPercentage);
+            }
+
+            // Metric 3: Calculating Throughput  
+            gettimeofday(&tv, NULL);   
+            seconds = tv.tv_sec;
+            ms = tv.tv_usec / 1000000.00;
+            endTime = seconds + ms;
+            double totalTime = endTime - startTime;
+            double throughput = (double)totalBytes / totalTime;
+            printf("Throughput: %.3f \n", throughput);
+
+            break;
+
+        }
+
+        if(header.seq_num != i){
+            correctOrder = false;
+        }
 
         // Step 3. Sending the message to the connected socket 
         /**
          * sendto
          * @param: serverfd is the specific file descriptor 
          * @param buffer is the message containing the msg sent  
-         * @param sizeof(buffer) is the length in bytes of the buffer 
+         * @param receieve is the length of bytes written in the buffer. Helps determine how much to send back 
          * @param client_address is the sockaddr structure in "which the sending address is to be stored"
          * @param clientLen is length of the supplied sockaddr structure
         */
         // Echoing packet back to the client
-        int msgSent = sendto(server_fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_address, sizeof(client_address)); 
+        int msgSent = sendto(server_fd, buffer, receive, 0, (struct sockaddr *)&client_address, sizeof(client_address)); 
         if (msgSent < 0) {
             perror("Send Failed");
             exit(EXIT_FAILURE);
         };
+
+        totalBytes = totalBytes + header.bytes_sent;
+        i++;
+        packetsRec++;
     }
 
     // Close connection

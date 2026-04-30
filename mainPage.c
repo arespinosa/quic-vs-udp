@@ -7,6 +7,8 @@
 #include <netinet/in.h> //Defines Internet address structures
 int udp_server();
 int udp_client();
+int quic_server();
+int quic_client();
 
 int main(){
     // Checking which mode the user wants to be in
@@ -25,6 +27,7 @@ int main(){
         printf("Select 0 if you're the Server or 1 for Client \n");
         scanf("%d", &protocol);
         if (protocol == 0) {
+            printf("------------------------------- \n");
             printf("You selected UDP Server \n");
             int server = udp_server();
             if(server < 0) {
@@ -33,10 +36,10 @@ int main(){
         }
         else {
             printf("------------------------------- \n");
-            printf("You selected UDP Client! \n");
+            printf("You selected UDP Client \n");
             int client = udp_client();
             if(client < 0) {
-                printf("Server failed\n");
+                printf("Client failed\n");
             }
 
         }
@@ -47,9 +50,17 @@ int main(){
         scanf("%d", &protocol);
         if (protocol == 0) {
             printf("You selected UDP QUIC Server \n");
+            int Qserver = quic_server();
+            if(Qserver < 0) {
+                printf("Server failed\n");
+            }
         }
         else {
             printf("You selected UDP QUIC Client! \n");
+            int Qlient = quic_client();
+            if(Qlient < 0) {
+                printf("Client failed!\n");
+            }
         }
     }
     else {
