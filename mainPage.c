@@ -45,10 +45,12 @@ int main(){
         }
     }
     else if(mode == 1) {
+        printf("------------------------------- \n");
         printf("You selected QUIC (Reliable) \n");
         printf("Select 0 if you're the Server or 1 for Client \n");
         scanf("%d", &protocol);
         if (protocol == 0) {
+            printf("------------------------------- \n");
             printf("You selected UDP QUIC Server \n");
             int Qserver = quic_server();
             if(Qserver < 0) {
