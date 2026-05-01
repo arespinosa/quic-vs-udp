@@ -25,7 +25,7 @@ int udp_server() {
     struct metric_headers header;
     int i = 0;
     int totalBytes = 0;
-    int packetsRec = 0;
+    int numPacketsLost = 0;
     char message[1024] = {0};
     struct timeval tv;
     double startTime;
@@ -33,6 +33,7 @@ int udp_server() {
 
     // Variables that will help with analysis 
     bool correctOrder = true;
+    bool packetsLost = false;
 
     // server_fd is the server's listening socket.
     int server_fd;
@@ -49,6 +50,14 @@ int udp_server() {
     // character array to serve as a buffer to store received data
     char buffer[1024] = {0};
 
+    // Prompting user w/ seconds delay and packet loss probability 
+    int lossPercentage;
+    int delay;
+    printf("Enter Loss Packet Probability(0-100) \n");
+    scanf("%d", &lossPercentage);
+    printf("Enter seconds delay \n");
+    scanf("%d", &delay);
+
     // 1. Creating socket with AF_INET + Datagram
     server_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -56,6 +65,8 @@ int udp_server() {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
+
+    
     // Bind address and port in the sockaddr_in struct
     address.sin_family = AF_INET;         // IPv4 address family
     address.sin_addr.s_addr = INADDR_ANY; // Binds to all available network interfaces
@@ -95,6 +106,15 @@ int udp_server() {
         
 
         memcpy(&header, buffer, sizeof(header));
+        int randPercent = rand() % 100;
+        if(randPercent == 7) {
+            randPercent= rand() % 100;
+        }
+        printf("Random Percent: %d \n", randPercent);
+        // if (randPercent < lossPercentage) {
+        //     printf("Simulating packet loss for seq %d\n", header.seq_num);
+        //     continue;  // Drop packet (no echo)
+        // }
         // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
         int msgBytes = receive - sizeof(header);
 
@@ -114,11 +134,11 @@ int udp_server() {
                 printf("Packets were received in the wrong order \n");
             }
             // Metric 2: Packet Loss Detection 
-            if(header.bytes_sent == packetsRec) {
+            if(!packetsLost) {
                 printf("No Packets were lost! \n");
             }
             else {
-                double lostPercentage = (double)packetsRec / header.bytes_sent;
+                double lostPercentage = (double)numPacketsLost / header.bytes_sent;
                 printf("Packets were lost! \n");
                 printf("Loss Percentage: %.3f \n", lostPercentage);
             }
@@ -136,9 +156,21 @@ int udp_server() {
 
         }
 
-        if(header.seq_num != i){
-            correctOrder = false;
+        if(randPercent < lossPercentage){
+            printf("Packet %d lost \n", i);
+            packetsLost = true;
+            numPacketsLost++;
+            strcpy(message, "message is lost");
+
+            int newLen = strlen(message);
+
+            // Overwrite the payload portion inside buffer
+            memcpy(buffer + sizeof(header), message, newLen);
+
+            // Update total packet size
+            receive = sizeof(header) + newLen;
         }
+        
 
         // Step 3. Sending the message to the connected socket 
         /**
@@ -150,6 +182,9 @@ int udp_server() {
          * @param clientLen is length of the supplied sockaddr structure
         */
         // Echoing packet back to the client
+        if (delay > 0) {
+            sleep(delay);    
+        }
         int msgSent = sendto(server_fd, buffer, receive, 0, (struct sockaddr *)&client_address, sizeof(client_address)); 
         if (msgSent < 0) {
             perror("Send Failed");
@@ -157,8 +192,13 @@ int udp_server() {
         };
 
         totalBytes = totalBytes + header.bytes_sent;
+        
+        if(header.seq_num != i){
+            correctOrder = false;
+        }
+
         i++;
-        packetsRec++;
+
     }
 
     // Close connection

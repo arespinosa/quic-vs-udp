@@ -13,8 +13,8 @@ int quic_client();
 int main(){
     // Checking which mode the user wants to be in
     int mode;
-    int lossPercentage; 
     int protocol;
+
 
     // Ask the user to type a number
     printf("Select mode for Message Transport \n");
@@ -30,8 +30,6 @@ int main(){
         if (protocol == 0) {
             printf("------------------------------- \n");
             printf("You selected UDP Server \n");
-            printf("Enter the loss packet percentage to mimic");
-            scanf("%d", &lossPercentage);
             int server = udp_server();
             if(server < 0) {
                 printf("Server failed\n");
