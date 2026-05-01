@@ -80,12 +80,11 @@ int udp_client() {
 
             sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
 
-            for(int j = 0; j <= i; j++) {
+            for(int j = 0; j < i; j++) {
                 printf("Latency for message %d: %.3f \n", (j+1), latencyList[j]);
                 sumLatency += latencyList[j];
             }
-            double denom = (double) i + 1;
-            avgLatency = sumLatency / denom;
+            avgLatency = (double)sumLatency / i;
             printf("Average Latency: %.3f \n", avgLatency);
 
             break;
@@ -116,17 +115,17 @@ int udp_client() {
         totalPackets++;
 
         int msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
-
+        if(msgRec < 0) {
+            perror("Receive Failed");
+            exit(EXIT_FAILURE);
+        }
         // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
         int msgBytes = msgRec - sizeof(header);
         memcpy(message, buffer + sizeof(header), msgBytes);
         // Assigning a null terminator to get only the message 
         message[msgBytes] = '\0';
         
-        if(msgRec < 0) {
-            perror("Receive Failed");
-            exit(EXIT_FAILURE);
-        }
+
 
         // If packet is receieved, calculating the end time for latency 
         gettimeofday(&tv, NULL); 

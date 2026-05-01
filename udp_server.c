@@ -129,7 +129,7 @@ int udp_server() {
             ms = tv.tv_usec / 1000000.00;
             endTime = seconds + ms;
             double totalTime = endTime - startTime;
-            double throughput = (double)totalBytes / totalTime;
+            double throughput = (totalBytes * 8.0) / totalTime;
             printf("Throughput: %.3f \n", throughput);
 
             break;

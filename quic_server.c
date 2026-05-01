@@ -39,8 +39,6 @@ int quic_server() {
     
     int i = 0;
     double totalBytes = 0.0;
-    double startTime;
-    double endTime;
     struct timespec start, end;
 
      // 3. Calculate difference in seconds and nanoseconds
@@ -69,9 +67,7 @@ int quic_server() {
     int indefinitely = 1;
     // Starting the time of when the server began listening 
     clock_gettime(CLOCK_MONOTONIC, &start);
-    double seconds = start.tv_sec;
-    double ns = start.tv_nsec;
-    startTime = seconds + ns;
+
 
     while (indefinitely) {
         socklen_t clientLen = sizeof(client_address);
@@ -138,10 +134,7 @@ int quic_server() {
         // If Client is done sending packets
         else if(header.seq_num == -1) {
             clock_gettime(CLOCK_MONOTONIC, &end);
-            seconds = start.tv_sec;
-            ns = start.tv_nsec;
-            endTime = seconds + ns;
-            double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_sec - start.tv_nsec) / 1e9;
+            double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
             double throughput = (totalBytes*8) / totalTime;
             printf("Throughoutput: %.3f \n", throughput);
             printf("No Packets were lost! \n");

@@ -36,6 +36,7 @@ int quic_client() {
     struct packet_headers header;
     struct packet_headers response;
     int i = 0;
+    int retransmissionCnt = 0;
     int indefinitely = 1;
     bool packetAcked = false;
 
@@ -45,6 +46,11 @@ int quic_client() {
         exit(EXIT_FAILURE);
     }
 
+    struct timeval tv;
+    tv.tv_sec = 1;  // 1 second timeout
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
 
@@ -53,7 +59,7 @@ int quic_client() {
         exit(EXIT_FAILURE);
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    // clock_gettime(CLOCK_MONOTONIC, &start);
 
     while (indefinitely) {
         printf("Enter message you want to send(or type STOP to stop): ");
@@ -69,13 +75,13 @@ int quic_client() {
             size_t packet_size = sizeof(header);
 
             sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
-            for(int j = 0; j <= i; j++) {
+            for(int j = 0; j < i; j++) {
                 printf("Latency for message %d: %.3f \n", (j+1), latencyList[j]);
                 sumLatency += latencyList[j];
             }
-            double denom = (double) i + 1;
-            avgLatency = sumLatency / denom;
+            avgLatency = sumLatency / i;
             printf("Average Latency: %.3f \n", avgLatency);
+            printf("Total Retransmissions: %d", retransmissionCnt);
             break;
 
         }
@@ -90,6 +96,8 @@ int quic_client() {
 
         // While the packet being sent hasn't been ACKED
         while (!packetAcked) {
+            clock_gettime(CLOCK_MONOTONIC, &start);
+
             // send packet
             int msgSend = sendto(sockfd,&header,sizeof(header), 0, (struct sockaddr *)&server_addr, addr_len);
 
@@ -99,23 +107,30 @@ int quic_client() {
             }
             // Resetting buffer 
             int msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
-            if(msgRec < 0){
-                perror("Receieve Failed");
-                exit(EXIT_FAILURE);
-            }
+            if (msgRec < 0) {
+                retransmissionCnt++;
+                continue;
+            } 
+            
+            memcpy(&response, buffer, sizeof(response));
             memcpy(&response, buffer, sizeof(response));
 
-            if (response.isAck) {
+            if (response.isAck && response.seq_num == i) {
                 packetAcked = true;
-                continue;
-            }
-            else {
-                // Similar to making message be ended by 0
-                header.data[sizeof(header.data) - 1] = '\0';
                 clock_gettime(CLOCK_MONOTONIC, &end);
-                double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_sec - start.tv_nsec) / 1e9;
+                double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
                 latencyList[i] = totalTime;
-                printf("Server: %s\n", header.data);
+
+                int msgRec2 = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
+
+                if (msgRec2 > 0) {
+                    memcpy(&response, buffer, sizeof(response));
+                    response.data[sizeof(response.data) - 1] = '\0';
+                    printf("Server: %s\n", response.data);
+                }
+
+                continue;
+                
             }
         }
 
