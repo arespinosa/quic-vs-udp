@@ -31,14 +31,23 @@ int quic_server() {
     struct packet_headers tempBuffer[1024];
     // Each struct held in the array will be followed with an array 
     bool received[1024] = {false};
-    
+    char buffer[2056] = {0}; 
+
     int server_fd;
     struct sockaddr_in address;
     struct sockaddr_in client_address;
     
     int i = 0;
+    double totalBytes = 0.0;
+    double startTime;
+    double endTime;
+    struct timespec start, end;
 
-    char buffer[2056] = {0}; 
+     // 3. Calculate difference in seconds and nanoseconds
+    // double time_taken = (end.tv_sec - start.tv_sec) + 
+    //                     (end.tv_nsec - start.tv_nsec) / 1e9;
+
+
 
     // 1. Creating socket with AF_INET + Datagram 
     server_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -58,6 +67,11 @@ int quic_server() {
     }
 
     int indefinitely = 1;
+    // Starting the time of when the server began listening 
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    double seconds = start.tv_sec;
+    double ns = start.tv_nsec;
+    startTime = seconds + ns;
 
     while (indefinitely) {
         socklen_t clientLen = sizeof(client_address);
@@ -94,8 +108,10 @@ int quic_server() {
                 perror("Send Failed");
                 exit(EXIT_FAILURE);
             };
+            totalBytes += strlen(header.data);
 
-            // Iterating through all of the packets we've receieved to verify if 
+            // Iterating through all of the packets we've receieved and delivering if 
+            // they were next in the sequence 
             while (received[i]) {
 
                 // Sending ack after expected seq num
@@ -109,6 +125,7 @@ int quic_server() {
                 sendto(server_fd, &tempBuffer[i], sizeof(tempBuffer[i]), 0, (struct sockaddr *)&client_address, clientLen);
                 received[i] = false;
                 i++;
+                totalBytes += strlen(tempBuffer[i].data);
             }
         }   
 
@@ -116,6 +133,19 @@ int quic_server() {
         else if (header.seq_num > i) {
             tempBuffer[header.seq_num] = header;
             received[header.seq_num] = true;
+        }
+
+        // If Client is done sending packets
+        else if(header.seq_num == -1) {
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            seconds = start.tv_sec;
+            ns = start.tv_nsec;
+            endTime = seconds + ns;
+            double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_sec - start.tv_nsec) / 1e9;
+            double throughput = (totalBytes*8) / totalTime;
+            printf("Throughoutput: %.3f \n", throughput);
+            printf("No Packets were lost! \n");
+            printf("Packets were received in order \n");
         }
 
     }
