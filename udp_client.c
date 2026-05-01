@@ -23,6 +23,11 @@ int udp_client() {
     struct timeval tv;
     double seconds;
     double ms;
+    double startTime;
+    double endTime; 
+    double sumLatency; 
+    double avgLatency;
+    double latencyList[20];
     int totalPackets = 0;
     struct metric_headers header;
 
@@ -75,6 +80,15 @@ int udp_client() {
             size_t packet_size = sizeof(header);
 
             sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
+
+            for(int j = 0; j <= i; j++) {
+                printf("Latency for message %d: %.3f \n", (j+1), latencyList[j]);
+                sumLatency += latencyList[j];
+            }
+            double denom = (double) i + 1;
+            avgLatency = sumLatency / denom;
+            printf("Average Latency: %.3f \n", avgLatency);
+
             break;
         }
 
@@ -92,6 +106,7 @@ int udp_client() {
         // After header is placed onto the buffer, placing message
         memcpy(buffer + sizeof(header), message, strlen(message));
         size_t packet_size = sizeof(header) + strlen(message);
+        startTime = currentTime;
         int msgSend = sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
         
         if(msgSend < 0) {
@@ -114,6 +129,13 @@ int udp_client() {
             exit(EXIT_FAILURE);
         }
 
+        // If packet is receieved, calculating the end time for latency 
+        gettimeofday(&tv, NULL); 
+        seconds = tv.tv_sec;
+        ms = tv.tv_usec / 1000000.00;
+        endTime = seconds + ms;
+        latencyList[i] = endTime - startTime;
+        
         i++;
         printf("Server: %s\n", message);
     }

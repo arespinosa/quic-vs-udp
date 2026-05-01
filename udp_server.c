@@ -24,7 +24,6 @@ int udp_server() {
 
     struct metric_headers header;
     int i = 0;
-    int totalPackets;
     int totalBytes = 0;
     int packetsRec = 0;
     char message[1024] = {0};
@@ -34,7 +33,6 @@ int udp_server() {
 
     // Variables that will help with analysis 
     bool correctOrder = true;
-    bool lostPackets = false;
 
     // server_fd is the server's listening socket.
     int server_fd;
@@ -95,7 +93,7 @@ int udp_server() {
             exit(EXIT_FAILURE);
         }
         
-
+        
         memcpy(&header, buffer, sizeof(header));
         // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
         int msgBytes = receive - sizeof(header);
@@ -121,7 +119,8 @@ int udp_server() {
             }
             else {
                 double lostPercentage = (double)packetsRec / header.bytes_sent;
-                printf("Loss Percentage: %.3f", lostPercentage);
+                printf("Packets were lost! \n");
+                printf("Loss Percentage: %.3f \n", lostPercentage);
             }
 
             // Metric 3: Calculating Throughput  
