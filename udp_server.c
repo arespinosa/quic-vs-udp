@@ -15,7 +15,7 @@
  * Fast Mode: UDP Server
  */
 int udp_server() {
-    // // Creating the header struct that will contain seq num and timestamp for each packet
+    // Creating the header struct that will contain seq num, timestamp, and bytes of each msg
     struct metric_headers {
         int seq_num;
         double time_stamp;
@@ -89,11 +89,11 @@ int udp_server() {
         */
         int receive = recvfrom(server_fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_address, &clientLen);
         if (receive < 0) {
-            perror("Package Recieve Failed");
+            perror("Packet Recieve Failed");
             exit(EXIT_FAILURE);
         }
         
-        
+
         memcpy(&header, buffer, sizeof(header));
         // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
         int msgBytes = receive - sizeof(header);

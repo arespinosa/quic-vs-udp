@@ -18,14 +18,13 @@ int udp_client() {
     };
 
     int i = 0; // will represent the order of the packets being sent 
-    int totalBytes = 0; // will represent the amount of bytes being sent
     // tv is used to grab seconds + microseconds of time 
     struct timeval tv;
     double seconds;
     double ms;
     double startTime;
     double endTime; 
-    double sumLatency; 
+    double sumLatency = 0.0; 
     double avgLatency;
     double latencyList[20];
     int totalPackets = 0;
