@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <sys/time.h>
 #include <stdbool.h>
+#include <errno.h>
+
 
 
 #define PORT 8080
@@ -108,11 +110,19 @@ int quic_client() {
             // Resetting buffer 
             int msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
             if (msgRec < 0) {
-                retransmissionCnt++;
-                continue;
-            } 
+                if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                    printf("[TIMEOUT] Packet %d\n", i);
+                    printf("[RETRANSMIT] Packet %d\n", i);
+                    retransmissionCnt++;
+                    continue;
+                }
+                else {
+                    perror("Receive Failed");
+                    exit(EXIT_FAILURE);
+
+                } 
+            }
             
-            memcpy(&response, buffer, sizeof(response));
             memcpy(&response, buffer, sizeof(response));
 
             if (response.isAck && response.seq_num == i) {
@@ -135,7 +145,7 @@ int quic_client() {
         }
 
         i++;
-    }
+        }
 
     close(sockfd);
     return 0;
