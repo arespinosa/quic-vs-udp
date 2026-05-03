@@ -11,14 +11,14 @@ int quic_server();
 int quic_client();
 
 int main(){
-    // Checking which mode the user wants to be in
+    // Checking which mode the user wants to be in and if they are server or client
     int mode;
     int protocol;
 
 
     // Ask the user to type a number
     printf("Select mode for Message Transport \n");
-    printf("Select 0 for Fast UDP Server \nSelect 1 for reliable QUIC Server\nSelect 2 for Testing\n");
+    printf("Select 0 for Fast UDP Server \nSelect 1 for reliable QUIC Server\n");
 
     // Get and save the number the user types
     scanf("%d", &mode);
@@ -67,7 +67,7 @@ int main(){
         }
     }
     else {
-        printf("WIP \n");
+        printf("Not a valid option \n");
     }
 
 }

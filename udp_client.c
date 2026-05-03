@@ -10,7 +10,7 @@
 #define IP_ADDY "127.0.0.1" // Defining the local host ip address 
 
 int udp_client() {
-
+    
     struct metric_headers {
         int seq_num;
         double time_stamp;
@@ -18,6 +18,7 @@ int udp_client() {
     };
 
     int i = 0; // will represent the order of the packets being sent 
+
     // tv is used to grab seconds + microseconds of time 
     struct timeval tv;
     double seconds;
