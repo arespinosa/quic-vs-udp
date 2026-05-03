@@ -25,14 +25,17 @@ int udp_server() {
     struct metric_headers header;
     int i = 0;
     int totalBytes = 0;
-    int packetsRec = 0;
+    int numPacketsLost = 0;
     char message[1024] = {0};
     struct timeval tv;
     double startTime;
     double endTime;
 
     // Variables that will help with analysis 
+    bool duplicatePackets = false;
+    bool packetsLost = false;
     bool correctOrder = true;
+    bool isLost = false;
 
     // server_fd is the server's listening socket.
     int server_fd;
@@ -49,6 +52,18 @@ int udp_server() {
     // character array to serve as a buffer to store received data
     char buffer[1024] = {0};
 
+    // Prompting user w/ seconds delay and packet loss probability 
+    int lossPercentage;
+    int delay;
+    int dupePercentage;
+    printf("Enter Loss Packet Probability(0-100) \n");
+    scanf("%d", &lossPercentage);
+    printf("Enter seconds delay \n");
+    scanf("%d", &delay);
+    printf("Enter Loss Packet Probability(0-100) \n");
+    scanf("%d", &dupePercentage);
+
+
     // 1. Creating socket with AF_INET + Datagram
     server_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -56,6 +71,8 @@ int udp_server() {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
+
+    
     // Bind address and port in the sockaddr_in struct
     address.sin_family = AF_INET;         // IPv4 address family
     address.sin_addr.s_addr = INADDR_ANY; // Binds to all available network interfaces
@@ -95,6 +112,20 @@ int udp_server() {
         
 
         memcpy(&header, buffer, sizeof(header));
+        // Every time we run rand(), first number is always 7. To avoid that, re running after the first time
+        int randPercent = rand() % 100;
+        if(randPercent == 7) {
+            randPercent= rand() % 100;
+        }
+        printf("Random Percent for Loss: %d \n", randPercent);
+
+        int randDupePercent = rand() % 100;
+        if(randDupePercent == 7) {
+            randDupePercent= rand() % 100;
+        }
+        printf("Random Percent for Dupe: %d \n", randDupePercent);
+    
+
         // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
         int msgBytes = receive - sizeof(header);
 
@@ -106,19 +137,27 @@ int udp_server() {
         if(header.seq_num == -1) {
             printf("------------------------------- \n");
             printf("Anaylsis of Messages Sent \n");
-            // Metric 1: Order of packets 
-            if(correctOrder){
-                printf("Packets were receieved in order \n");
+            // Metric 1: Checking if duplicate packets were sent
+            if(duplicatePackets){
+                printf("Duplicate Packets were sent \n");
             }
             else{
-                printf("Packets were received in the wrong order \n");
+                printf("No Duplicate Packets were sent \n");
             }
-            // Metric 2: Packet Loss Detection 
-            if(header.bytes_sent == packetsRec) {
+
+            // Metric 2: Checking if the order of the packets were sent correctly 
+            if(correctOrder){
+                printf("Packets were sent in order \n");
+            }
+            else {
+                printf("Packets were NOT sent in order \n");
+            }
+            // Metric 3: Packet Loss Detection 
+            if(!packetsLost) {
                 printf("No Packets were lost! \n");
             }
             else {
-                double lostPercentage = (double)packetsRec / header.bytes_sent;
+                double lostPercentage = (double)numPacketsLost / header.bytes_sent;
                 printf("Packets were lost! \n");
                 printf("Loss Percentage: %.3f \n", lostPercentage);
             }
@@ -135,10 +174,24 @@ int udp_server() {
             break;
 
         }
+        isLost = false;
+        if(randPercent < lossPercentage){
+            printf("Packet %d lost \n", i);
+            packetsLost = true;
+            numPacketsLost++;
+            strcpy(message, "message is lost");
 
-        if(header.seq_num != i){
-            correctOrder = false;
+            int newLen = strlen(message);
+
+            // Overwrite the payload portion inside buffer
+            memcpy(buffer + sizeof(header), message, newLen);
+
+            // Update total packet size
+            receive = sizeof(header) + newLen;
+
+            isLost = true;
         }
+        
 
         // Step 3. Sending the message to the connected socket 
         /**
@@ -150,15 +203,37 @@ int udp_server() {
          * @param clientLen is length of the supplied sockaddr structure
         */
         // Echoing packet back to the client
+        if (delay > 0) {
+            sleep(delay);    
+        }
         int msgSent = sendto(server_fd, buffer, receive, 0, (struct sockaddr *)&client_address, sizeof(client_address)); 
         if (msgSent < 0) {
             perror("Send Failed");
             exit(EXIT_FAILURE);
         };
 
+
+        if (randDupePercent < dupePercentage && !isLost) {
+
+            int dupSent = sendto(server_fd, buffer, receive, 0, (struct sockaddr *)&client_address, sizeof(client_address));
+
+            if (dupSent < 0) {
+                perror("Duplicate Send Failed");
+                exit(EXIT_FAILURE);
+            }
+            duplicatePackets = true;
+            correctOrder = false;
+        }
+        
+
         totalBytes = totalBytes + header.bytes_sent;
+        
+        if(header.seq_num != i){
+            correctOrder = false;
+        }
+
         i++;
-        packetsRec++;
+
     }
 
     // Close connection
