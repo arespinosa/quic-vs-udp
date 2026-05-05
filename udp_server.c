@@ -52,7 +52,7 @@ int udp_server() {
     // character array to serve as a buffer to store received data
     char buffer[1024] = {0};
 
-    // Prompting user w/ seconds delay and packet loss probability 
+    // Prompting user w/ seconds delay, packet loss and dupe packet prob
     int lossPercentage;
     int delay;
     int dupePercentage;
@@ -60,7 +60,7 @@ int udp_server() {
     scanf("%d", &lossPercentage);
     printf("Enter seconds delay \n");
     scanf("%d", &delay);
-    printf("Enter Loss Packet Probability(0-100) \n");
+    printf("Enter Duplicate Packet Probability(0-100) \n");
     scanf("%d", &dupePercentage);
 
 
@@ -174,7 +174,9 @@ int udp_server() {
             break;
 
         }
+
         isLost = false;
+        // If current packet is "lost", replacing orig msg
         if(randPercent < lossPercentage){
             printf("Packet %d lost \n", i);
             packetsLost = true;
@@ -212,7 +214,7 @@ int udp_server() {
             exit(EXIT_FAILURE);
         };
 
-
+        // If packet isn't lost and is currently enabled to be duped
         if (randDupePercent < dupePercentage && !isLost) {
 
             int dupSent = sendto(server_fd, buffer, receive, 0, (struct sockaddr *)&client_address, sizeof(client_address));
@@ -225,7 +227,6 @@ int udp_server() {
             correctOrder = false;
         }
         
-
         totalBytes = totalBytes + header.bytes_sent;
         
         if(header.seq_num != i){
