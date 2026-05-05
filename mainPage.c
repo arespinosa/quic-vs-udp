@@ -18,14 +18,14 @@ int main(){
 
     // Ask the user to type a number
     printf("Select mode for Message Transport \n");
-    printf("Select 0 for Fast UDP Server \nSelect 1 for reliable QUIC Server\n");
+    printf("Select 0 for fast UDP \nSelect 1 for reliable QUIC \n");
 
     // Get and save the number the user types
     scanf("%d", &mode);
     if(mode == 0) {
         printf("------------------------------- \n");
         printf("You selected UDP (Fast) \n");
-        printf("Select 0 if you're the Server or 1 for Client \n");
+        printf("Select 0 if you're the Server\nSelect 1 for Client \n");
         scanf("%d", &protocol);
         if (protocol == 0) {
             printf("------------------------------- \n");
@@ -48,7 +48,7 @@ int main(){
     else if(mode == 1) {
         printf("------------------------------- \n");
         printf("You selected QUIC (Reliable) \n");
-        printf("Select 0 if you're the Server or 1 for Client \n");
+        printf("Select 0 if you're the Server\n Select 1 for Client \n");
         scanf("%d", &protocol);
         if (protocol == 0) {
             printf("------------------------------- \n");

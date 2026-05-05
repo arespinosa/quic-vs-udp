@@ -9,13 +9,14 @@
 #include <stdbool.h>
 #include <errno.h>
 
-
-
 #define PORT 8080
 #define IP_ADDY "127.0.0.1"
 
 
-
+/**
+ * Reliable Mode: Client 
+ * Where user will be sending messages to the server 
+*/
 int quic_client() {
     struct packet_headers {
         bool isAck;
@@ -42,15 +43,22 @@ int quic_client() {
     int indefinitely = 1;
     bool packetAcked = false;
 
+    // Create the socket like we usually do 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
 
+    // Creating timeval object with 1 second 
     struct timeval tv;
-    tv.tv_sec = 1;  // 1 second timeout
+    tv.tv_sec = 1;  
     tv.tv_usec = 0;
+    /** int setsockopt - Modifies sockfd to now use timeout
+     * @param: sockfd - Specifying which socket I want to modify with options 
+     * @param SOL_SOCKET - sets the options of timeout at the socket level 
+     * @param SO_RCVTIMEO -  Sets the timeout value that specifies the max amount of time an input function waits until it completes
+    */
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     server_addr.sin_family = AF_INET;
@@ -61,7 +69,6 @@ int quic_client() {
         exit(EXIT_FAILURE);
     }
 
-    // clock_gettime(CLOCK_MONOTONIC, &start);
 
     while (indefinitely) {
         printf("Enter message you want to send(or type STOP to stop): ");
@@ -73,10 +80,11 @@ int quic_client() {
             // copy header into buffer
             memcpy(buffer, &header, sizeof(header));
 
-            // Will not include a message since I'm just telling server to stop
+            // Sending a packet with -1 for server to compute metrics 
             size_t packet_size = sizeof(header);
 
             sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
+            // Calculating the latency for each packet 
             for(int j = 0; j < i; j++) {
                 printf("Latency for message %d: %.3f \n", (j+1), latencyList[j]);
                 sumLatency += latencyList[j];
@@ -89,9 +97,10 @@ int quic_client() {
         }
             
 
-       
         header.seq_num = i;
+        // Copying the message from the user into the header data 
         strncpy(header.data, message, sizeof(header.data) - 1);
+        // In order for the system to know when to stop, notified by 0 
         header.data[sizeof(header.data) - 1] = '\0';
         header.isAck = false;
         packetAcked = header.isAck;
@@ -110,17 +119,21 @@ int quic_client() {
             // Resetting buffer 
             int msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
             if (msgRec < 0) {
-                if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                    printf("[TIMEOUT] Packet %d\n", i);
-                    printf("[RETRANSMIT] Packet %d\n", i);
-                    retransmissionCnt++;
-                    continue;
-                }
-                else {
-                    perror("Receive Failed");
-                    exit(EXIT_FAILURE);
+                printf("Packet %d time out \n", i);
+                printf("Resending Packet %d\n", i);
+                retransmissionCnt++;
+                continue;
+            // if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                    // printf("Packet %d time out \n", i);
+                    // printf("Resending Packet %d\n", i);
+                    // retransmissionCnt++;
+                    // continue;
+                // }
+                // else {
+                //     perror("Receive Failed");
+                //     exit(EXIT_FAILURE);
 
-                } 
+                // } 
             }
             
             memcpy(&response, buffer, sizeof(response));

@@ -4,11 +4,16 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
-#include <sys/socket.h> //Defines core socket functions and constants.
-#include <netinet/in.h> //Defines Internet address structures.
-#define PORT 8080       // Port number
-#define IP_ADDY "127.0.0.1" // Defining the local host ip address 
+#include <sys/socket.h> 
+#include <netinet/in.h> 
+#include <stdbool.h>
 
+#define PORT 8080       // Port number
+#define IP_ADDY "127.0.0.1" // Local IP Address 
+/**
+ * Fast Mode: Client 
+ * Where user will be sending messages to the server 
+*/
 int udp_client() {
     
     struct metric_headers {
@@ -17,7 +22,8 @@ int udp_client() {
         int bytes_sent;
     };
 
-    int i = 0; // will represent the order of the packets being sent 
+    // the order of the packets being sent 
+     int i = 0;
 
     // tv is used to grab seconds + microseconds of time 
     struct timeval tv;
@@ -45,7 +51,7 @@ int udp_client() {
     char buffer[1024] = {0};
     char message[1024] = {0};
     int indefinitely = 1;
-
+    // Creating socket 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         perror("Socket failed");
@@ -54,7 +60,7 @@ int udp_client() {
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
-
+    // On client side, converts IP address into byte representation 
     if (inet_pton(AF_INET, IP_ADDY, &server_addr.sin_addr) <= 0) {
         perror("Invalid address");
         exit(EXIT_FAILURE);
@@ -64,6 +70,7 @@ int udp_client() {
         printf("Enter message you want to send(or type STOP to stop): ");
         fgets(message, sizeof(message), stdin);
 
+        // If the user inputs STOP, will stop sending messages and compute latency values 
         if (strcmp(message, "STOP\n") == 0) {
             header.seq_num = -1;
             header.bytes_sent = totalPackets;
@@ -115,28 +122,48 @@ int udp_client() {
 
         totalPackets++;
 
-        int msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
-        if(msgRec < 0) {
-            perror("Receive Failed");
-            exit(EXIT_FAILURE);
+        int msgRec;
+
+        while (1) {
+            msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0,
+                            (struct sockaddr *)&server_addr, &addr_len);
+
+            if (msgRec < 0) {
+                perror("Receive Failed");
+                exit(EXIT_FAILURE);
+            }
+
+            int msgBytes = msgRec - sizeof(header);
+            memcpy(message, buffer + sizeof(header), msgBytes);
+            message[msgBytes] = '\0';
+
+            printf("Server: %s\n", message);
+            bool firstPacket = true;
+            // Only measure latency once (first received packet)
+            if (firstPacket) {
+                gettimeofday(&tv, NULL); 
+                seconds = tv.tv_sec;
+                ms = tv.tv_usec / 1000000.00;
+                endTime = seconds + ms;
+
+                latencyList[i] = endTime - startTime;
+                i++;
+
+                firstPacket = false;
+            }
+            
+            // FIXME: Comment on select 
+            struct timeval tv = {0, 0};
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(sockfd, &fds);
+
+            int ret = select(sockfd + 1, &fds, NULL, NULL, &tv);
+
+            if (ret <= 0) {
+                break;  // no more queued packets → move to next user input
+            }
         }
-        // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
-        int msgBytes = msgRec - sizeof(header);
-        memcpy(message, buffer + sizeof(header), msgBytes);
-        // Assigning a null terminator to get only the message 
-        message[msgBytes] = '\0';
-        
-
-
-        // If packet is receieved, calculating the end time for latency 
-        gettimeofday(&tv, NULL); 
-        seconds = tv.tv_sec;
-        ms = tv.tv_usec / 1000000.00;
-        endTime = seconds + ms;
-        latencyList[i] = endTime - startTime;
-        
-        i++;
-        printf("Server: %s\n", message);
     }
     // Closing connections 
     close(sockfd);

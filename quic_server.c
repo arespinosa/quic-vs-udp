@@ -9,12 +9,14 @@
 #include <stdbool.h>  // Allows me to use booleans 
 #include <time.h>
 #define PORT 8080
-//FIXME: Need to see how to mimic duplicates 
+
 /**
  * Reliable Mode: QUIC Server
  * Ensures 
  * - correct order
  * - no loss 
+ * - no dupes 
+ * 
  */
 
 int quic_server() {
@@ -29,8 +31,9 @@ int quic_server() {
 
     struct packet_headers header;
 
-    // Creating an array of structs for storage of packets 
+    // Creating a temp buff used for maintaining order 
     struct packet_headers tempBuffer[1024];
+
     // Each struct held in the array will be followed with an array 
     bool received[1024] = {false};
     char buffer[2056] = {0}; 
@@ -43,9 +46,6 @@ int quic_server() {
     double totalBytes = 0.0;
     struct timespec start, end;
 
-     // 3. Calculate difference in seconds and nanoseconds
-    // double time_taken = (end.tv_sec - start.tv_sec) + 
-    //                     (end.tv_nsec - start.tv_nsec) / 1e9;
 
     // Prompting user w/ seconds delay and packet loss probability 
     int lossPercentage;
@@ -74,7 +74,7 @@ int quic_server() {
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Bind socket to IP address and port 
+    // Step 2. Bind socket to IP address and port 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
@@ -87,7 +87,6 @@ int quic_server() {
 
     while (indefinitely) {
         socklen_t clientLen = sizeof(client_address);
-      
 
         // Receiving the data from the client 
         int receive = recvfrom(server_fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_address, &clientLen);
@@ -100,7 +99,7 @@ int quic_server() {
         // Grabbing the contents of header from buf and placing them to header struct
         memcpy(&header, buffer, sizeof(header));
 
-         // If Client is done sending packets
+         // If Client is done sending packets, computing metrics
         if(header.seq_num == -1) {
             clock_gettime(CLOCK_MONOTONIC, &end);
             double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
@@ -110,9 +109,9 @@ int quic_server() {
             printf("Throughoutput: %.3f \n", throughput);
             printf("No Packets were lost! \n");
             printf("Packets were received in order \n");
-            printf("Simulated Loss: %d \n", totalLoss);
-            printf("Simulated Duplicates: %d \n", totalDupes);
-            // FIXME: continue or break? 
+            printf("Handled %d Packet Losses\n", totalLoss);
+            printf("Handled %d Packet Duplicates \n", totalDupes);
+            continue;
         }
 
 
@@ -144,29 +143,32 @@ int quic_server() {
             
             // Sending an ACK to client that msg was recieved 
             header.isAck = true;
-            // Echoing packet back to the client
+            // First packet being sent is with ACK
             int AckSent = sendto(server_fd, &header, sizeof(header), 0, (struct sockaddr *)&client_address, sizeof(client_address)); 
             if (AckSent < 0) {
                 perror("Send Failed");
                 exit(EXIT_FAILURE);
             };
 
-            // ACK was sent, so resending to echo back 
+            // ACK was sent, So packet with msg is sent 
             header.isAck = false;
             int msgSent = sendto(server_fd, &header, sizeof(header), 0,(struct sockaddr *)&client_address, sizeof(client_address));
             if (msgSent < 0) {
                 perror("Send Failed");
                 exit(EXIT_FAILURE);
             };
+
             totalBytes += strlen(header.data);
+
+            // Attempting to duplicate packet if enabled 
             if(randDupePercent < dupePercentage){
-                printf("[NETWORK] DUPLICATE packet %d\n", header.seq_num);
+                printf("Duplicate packet %d\n", header.seq_num);
                 totalDupes++;
                 sendto(server_fd, &header, sizeof(header), 0, (struct sockaddr *)&client_address, clientLen);
             }
 
-            // Iterating through all of the packets we've receieved and delivering if 
-            // they were next in the sequence 
+            // Checking to see if any out of order packets are in the temp buff
+            // If they are, we send all of them in order 
             while (received[i]) {
 
                 // Sending ack after expected seq num
