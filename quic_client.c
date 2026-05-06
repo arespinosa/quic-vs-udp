@@ -123,17 +123,6 @@ int quic_client() {
                 printf("Resending Packet %d\n", i);
                 retransmissionCnt++;
                 continue;
-            // if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                    // printf("Packet %d time out \n", i);
-                    // printf("Resending Packet %d\n", i);
-                    // retransmissionCnt++;
-                    // continue;
-                // }
-                // else {
-                //     perror("Receive Failed");
-                //     exit(EXIT_FAILURE);
-
-                // } 
             }
             
             memcpy(&response, buffer, sizeof(response));

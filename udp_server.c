@@ -6,15 +6,17 @@
 #include <sys/socket.h> //Defines core socket functions and constants.
 #include <netinet/in.h> //Defines Internet address structures.
 #include <sys/time.h> // Allows me to measure time in milliseconds 
-#include <stdbool.h>
+#include <stdbool.h> // Allos me to use booleans 
 
 
 #define PORT 8080 // Port number 
-//TODO: Fix the timing with how QUIC calculates it 
 /**
  * Fast Mode: UDP Server
  */
 int udp_server() {
+    // Used to make random numbers each time 
+    srand(time(NULL));
+
     // Creating the header struct that will contain seq num, timestamp, and bytes of each msg
     struct metric_headers {
         int seq_num;
@@ -85,7 +87,6 @@ int udp_server() {
     // Making the server run indefinitely to process multiple messages
     int indefinitely = 1;
     // Starting the time of when the server began listening 
-
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     while (indefinitely) {
@@ -111,15 +112,9 @@ int udp_server() {
         memcpy(&header, buffer, sizeof(header));
         // Every time we run rand(), first number is always 7. To avoid that, re running after the first time
         int randPercent = rand() % 100;
-        if(randPercent == 7) {
-            randPercent= rand() % 100;
-        }
         printf("Random Percent for Loss: %d \n", randPercent);
 
         int randDupePercent = rand() % 100;
-        if(randDupePercent == 7) {
-            randDupePercent= rand() % 100;
-        }
         printf("Random Percent for Dupe: %d \n", randDupePercent);
     
 
@@ -177,13 +172,12 @@ int udp_server() {
             packetsLost = true;
             numPacketsLost++;
             strcpy(message, "message is lost");
-
             int newLen = strlen(message);
 
-            // Overwrite the payload portion inside buffer
+            // Modifying the payload with lost message
             memcpy(buffer + sizeof(header), message, newLen);
 
-            // Update total packet size
+            // Updating total packet size
             receive = sizeof(header) + newLen;
 
             isLost = true;
@@ -219,10 +213,9 @@ int udp_server() {
                 exit(EXIT_FAILURE);
             }
             duplicatePackets = true;
-            correctOrder = false;
         }
         
-        totalBytes = totalBytes + header.bytes_sent;
+        totalBytes = totalBytes + msgSent;
         
         if(header.seq_num != i){
             correctOrder = false;

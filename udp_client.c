@@ -114,25 +114,22 @@ int udp_client() {
         }
 
         totalPackets++;
+        bool firstPacket = true;
+        while (indefinitely) {
+            int receive = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
 
-        int msgRec;
-
-        while (1) {
-            msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0,
-                            (struct sockaddr *)&server_addr, &addr_len);
-
-            if (msgRec < 0) {
+            if (receive < 0) {
                 perror("Receive Failed");
                 exit(EXIT_FAILURE);
             }
 
-            int msgBytes = msgRec - sizeof(header);
+            int msgBytes = receive - sizeof(header);
             memcpy(message, buffer + sizeof(header), msgBytes);
             message[msgBytes] = '\0';
 
             printf("Server: %s\n", message);
-            bool firstPacket = true;
-            // Only measure latency once (first received packet)
+            
+            // Measuring the latency of original packet
             if (firstPacket) {
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 latencyList[i] = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
