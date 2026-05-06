@@ -10,6 +10,7 @@
 
 #define PORT 8080       // Port number
 #define IP_ADDY "127.0.0.1" // Local IP Address 
+
 /**
  * Fast Mode: Client 
  * Where user will be sending messages to the server 
@@ -25,12 +26,8 @@ int udp_client() {
     // the order of the packets being sent 
      int i = 0;
 
-    // tv is used to grab seconds + microseconds of time 
-    struct timeval tv;
-    double seconds;
-    double ms;
-    double startTime;
-    double endTime; 
+    // timespec will help to compute start and end times for latency 
+    struct timespec start, end;
     double sumLatency = 0.0; 
     double avgLatency;
     double latencyList[20];
@@ -74,11 +71,9 @@ int udp_client() {
         if (strcmp(message, "STOP\n") == 0) {
             header.seq_num = -1;
             header.bytes_sent = totalPackets;
-            gettimeofday(&tv, NULL);
-            seconds = tv.tv_sec;
-            ms = tv.tv_usec / 1000000.00;
-            double currentTime = seconds + ms;
-            header.time_stamp = currentTime;
+            clock_gettime(CLOCK_MONOTONIC, &start);
+            
+            header.time_stamp = start.tv_sec + (start.tv_nsec / 1e9);
 
             // copy header into buffer
             memcpy(buffer, &header, sizeof(header));
@@ -100,10 +95,8 @@ int udp_client() {
 
         header.seq_num = i;
         header.bytes_sent = strlen(message);
-        gettimeofday(&tv, NULL);
-        seconds = tv.tv_sec;
-        ms = tv.tv_usec / 1000000.00;
-        double currentTime = seconds + ms;
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        double currentTime = end.tv_sec + (end.tv_nsec/1e9);
         header.time_stamp = currentTime;
         
         // Copies contents of header to buffer
@@ -112,7 +105,7 @@ int udp_client() {
         // After header is placed onto the buffer, placing message
         memcpy(buffer + sizeof(header), message, strlen(message));
         size_t packet_size = sizeof(header) + strlen(message);
-        startTime = currentTime;
+        clock_gettime(CLOCK_MONOTONIC, &start);
         int msgSend = sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
         
         if(msgSend < 0) {
@@ -141,27 +134,30 @@ int udp_client() {
             bool firstPacket = true;
             // Only measure latency once (first received packet)
             if (firstPacket) {
-                gettimeofday(&tv, NULL); 
-                seconds = tv.tv_sec;
-                ms = tv.tv_usec / 1000000.00;
-                endTime = seconds + ms;
-
-                latencyList[i] = endTime - startTime;
+                clock_gettime(CLOCK_MONOTONIC, &end);
+                latencyList[i] = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
                 i++;
 
                 firstPacket = false;
             }
             
-            // FIXME: Comment on select 
+            /**
+             * If there is a dupe packet, mimicking Dupe Packets with select
+             * @param: sockfd + 1 - Based on instructions, add 1 to fd 
+             * @param: fds - the File Descriptor set 
+             * @param: read - read command is set to null
+             * @param: write - write command is set to null 
+            */
             struct timeval tv = {0, 0};
-            fd_set fds;
-            FD_ZERO(&fds);
-            FD_SET(sockfd, &fds);
+            fd_set fileDescriptor_Set;
+            //Clearing and setting the set after each sequence 
+            FD_ZERO(&fileDescriptor_Set);
+            FD_SET(sockfd, &fileDescriptor_Set);
 
-            int ret = select(sockfd + 1, &fds, NULL, NULL, &tv);
+            int dupe = select(sockfd + 1, &fileDescriptor_Set, NULL, NULL, &tv);
 
-            if (ret <= 0) {
-                break;  // no more queued packets → move to next user input
+            if (dupe <= 0) {
+                break;  
             }
         }
     }

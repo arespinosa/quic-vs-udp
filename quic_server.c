@@ -103,7 +103,7 @@ int quic_server() {
         if(header.seq_num == -1) {
             clock_gettime(CLOCK_MONOTONIC, &end);
             double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-            double throughput = (totalBytes*8) / totalTime;
+            double throughput = (totalBytes*8.0) / totalTime;
             printf("------------------------------- \n");
             printf("Anaylsis of Messages Sent \n");
             printf("Throughoutput: %.3f \n", throughput);

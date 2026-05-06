@@ -10,7 +10,7 @@
 
 
 #define PORT 8080 // Port number 
-
+//TODO: Fix the timing with how QUIC calculates it 
 /**
  * Fast Mode: UDP Server
  */
@@ -27,9 +27,8 @@ int udp_server() {
     int totalBytes = 0;
     int numPacketsLost = 0;
     char message[1024] = {0};
-    struct timeval tv;
-    double startTime;
-    double endTime;
+    struct timespec start, end;
+
 
     // Variables that will help with analysis 
     bool duplicatePackets = false;
@@ -86,11 +85,9 @@ int udp_server() {
     // Making the server run indefinitely to process multiple messages
     int indefinitely = 1;
     // Starting the time of when the server began listening 
-    gettimeofday(&tv, NULL);
-    double seconds = tv.tv_sec;
-    double ms = tv.tv_usec / 1000000.00;
-    startTime = seconds + ms;
-    
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     while (indefinitely) {
         // Updating size of clientLen since message will be different every time 
         socklen_t clientLen = sizeof(client_address);
@@ -163,11 +160,9 @@ int udp_server() {
             }
 
             // Metric 3: Calculating Throughput  
-            gettimeofday(&tv, NULL);   
-            seconds = tv.tv_sec;
-            ms = tv.tv_usec / 1000000.00;
-            endTime = seconds + ms;
-            double totalTime = endTime - startTime;
+            clock_gettime(CLOCK_MONOTONIC, &end); 
+
+            double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
             double throughput = (totalBytes * 8.0) / totalTime;
             printf("Throughput: %.3f \n", throughput);
 
