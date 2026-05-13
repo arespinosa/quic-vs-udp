@@ -30,14 +30,11 @@ int quic_server() {
     };
 
     struct packet_headers header;
-
-    // Creating a temp buff used for maintaining order 
+    // tempBuffer will hold the msgs out of order and receieved will store the sequences that came in out of order
     struct packet_headers tempBuffer[1024];
-
-    // Each struct held in the array will be followed with an array 
     bool received[1024] = {false};
-    char buffer[2056] = {0}; 
 
+    char buffer[2056] = {0}; 
     int server_fd;
     struct sockaddr_in address;
     struct sockaddr_in client_address;
@@ -47,7 +44,7 @@ int quic_server() {
     struct timespec start, end;
 
 
-    // Prompting user w/ seconds delay and packet loss probability 
+    // Prompting user w/ seconds delay, packet loss + dupe packet prob 
     int lossPercentage;
     int delay;
     int dupePercentage;
@@ -74,7 +71,7 @@ int quic_server() {
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Step 2. Bind socket to IP address and port 
+    // 2. Bind socket to IP address and port 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
@@ -103,36 +100,28 @@ int quic_server() {
         if(header.seq_num == -1) {
             clock_gettime(CLOCK_MONOTONIC, &end);
             double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-            double throughput = (totalBytes*8) / totalTime;
+            double throughput = (totalBytes*8.0) / totalTime;
             printf("------------------------------- \n");
             printf("Anaylsis of Messages Sent \n");
-            printf("Throughoutput: %.3f \n", throughput);
+            printf("Throughoutput: %.3f bits per sec \n", throughput);
             printf("No Packets were lost! \n");
             printf("Packets were received in order \n");
             printf("Handled %d Packet Losses\n", totalLoss);
             printf("Handled %d Packet Duplicates \n", totalDupes);
-            continue;
+            break;
         }
-
 
         int randPercent = rand() % 100;
-        if(randPercent == 7) {
-            randPercent= rand() % 100;
-        }
         printf("Random Percent for Loss: %d \n", randPercent);
 
         randDupePercent = rand() % 100;
-        if(randDupePercent == 7) {
-            randDupePercent= rand() % 100;
-        }
         printf("Random Percent for Dupe: %d \n", randDupePercent);
 
         if(randPercent < lossPercentage){
-            printf("Network lost Packet %d lost \n",header.seq_num);
+            printf("Network lost Packet %d lost \n", header.seq_num);
             totalLoss++;
             continue;
         }
-        
 
         // If seq number matches expected packet 
         else if (header.seq_num == i) {
@@ -140,17 +129,16 @@ int quic_server() {
             if(delay > 0){
                 sleep(delay);
             }
-            
-            // Sending an ACK to client that msg was recieved 
+
+            // First packet will be ACK
             header.isAck = true;
-            // First packet being sent is with ACK
             int AckSent = sendto(server_fd, &header, sizeof(header), 0, (struct sockaddr *)&client_address, sizeof(client_address)); 
             if (AckSent < 0) {
                 perror("Send Failed");
                 exit(EXIT_FAILURE);
             };
 
-            // ACK was sent, So packet with msg is sent 
+            // Second packet will be of msg 
             header.isAck = false;
             int msgSent = sendto(server_fd, &header, sizeof(header), 0,(struct sockaddr *)&client_address, sizeof(client_address));
             if (msgSent < 0) {
@@ -160,36 +148,28 @@ int quic_server() {
 
             totalBytes += strlen(header.data);
 
-            // Attempting to duplicate packet if enabled 
+            // Duplicating Packet 
             if(randDupePercent < dupePercentage){
                 printf("Duplicate packet %d\n", header.seq_num);
                 totalDupes++;
                 sendto(server_fd, &header, sizeof(header), 0, (struct sockaddr *)&client_address, clientLen);
             }
-
+           
             // Checking to see if any out of order packets are in the temp buff
             // If they are, we send all of them in order 
             while (received[i]) {
-
-                // Sending ack after expected seq num
                 struct packet_headers tempHeader = tempBuffer[i];
                 tempHeader.isAck = true;
+                int ackSent = sendto(server_fd, &tempHeader, sizeof(tempHeader), 0, (struct sockaddr *)&client_address, clientLen);
+                if(ackSent < 0){
+                    perror("ACK not sent");
+                    exit(EXIT_FAILURE);
+                }
 
-                sendto(server_fd, &tempHeader, sizeof(tempHeader), 0, (struct sockaddr *)&client_address, clientLen);
-
-                // After ACK is sent, resending echo back 
                 tempBuffer[i].isAck = false;
                 sendto(server_fd, &tempBuffer[i], sizeof(tempBuffer[i]), 0, (struct sockaddr *)&client_address, clientLen);
                 received[i] = false;
                 i++;
-                totalBytes += strlen(tempBuffer[i].data);
-
-                if (randDupePercent < dupePercentage) {
-                    printf("[NETWORK] DUPLICATE packet %d\n", header.seq_num);
-                    totalDupes++;
-
-                    sendto(server_fd, &header, sizeof(header), 0,(struct sockaddr *)&client_address, clientLen);
-                }
             }
         }   
 

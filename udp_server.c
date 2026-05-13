@@ -6,15 +6,16 @@
 #include <sys/socket.h> //Defines core socket functions and constants.
 #include <netinet/in.h> //Defines Internet address structures.
 #include <sys/time.h> // Allows me to measure time in milliseconds 
-#include <stdbool.h>
-
-
+#include <stdbool.h> // Allos me to use booleans 
 #define PORT 8080 // Port number 
 
 /**
  * Fast Mode: UDP Server
  */
 int udp_server() {
+    // Used to make random numbers each time 
+    srand(time(NULL));
+
     // Creating the header struct that will contain seq num, timestamp, and bytes of each msg
     struct metric_headers {
         int seq_num;
@@ -27,9 +28,8 @@ int udp_server() {
     int totalBytes = 0;
     int numPacketsLost = 0;
     char message[1024] = {0};
-    struct timeval tv;
-    double startTime;
-    double endTime;
+    struct timespec start, end;
+
 
     // Variables that will help with analysis 
     bool duplicatePackets = false;
@@ -64,7 +64,7 @@ int udp_server() {
     scanf("%d", &dupePercentage);
 
 
-    // 1. Creating socket with AF_INET + Datagram
+    // Creating socket with AF_INET + Datagram
     server_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
     if (server_fd == -1) {
@@ -86,46 +86,28 @@ int udp_server() {
     // Making the server run indefinitely to process multiple messages
     int indefinitely = 1;
     // Starting the time of when the server began listening 
-    gettimeofday(&tv, NULL);
-    double seconds = tv.tv_sec;
-    double ms = tv.tv_usec / 1000000.00;
-    startTime = seconds + ms;
-    
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     while (indefinitely) {
         // Updating size of clientLen since message will be different every time 
         socklen_t clientLen = sizeof(client_address);
 
-        // Step 2. Recieving the data from client
-        /**
-         * recvfrom
-         * @param: serverfd is the specific file descriptor 
-         * @param buffer is where the message is currently stored 
-         * @param sizeof(buffer) is the length in bytes of the buffer 
-         * @param client_address is the sockaddr structure in "which the sending address is to be stored"
-         * @param clientLen is length of the supplied sockaddr structure
-        */
+        // Recieving the data from client
         int receive = recvfrom(server_fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_address, &clientLen);
         if (receive < 0) {
             perror("Packet Recieve Failed");
             exit(EXIT_FAILURE);
         }
         
-
         memcpy(&header, buffer, sizeof(header));
-        // Every time we run rand(), first number is always 7. To avoid that, re running after the first time
+
+        // Generating a random percent for both packet loss and duplicate packets 
         int randPercent = rand() % 100;
-        if(randPercent == 7) {
-            randPercent= rand() % 100;
-        }
         printf("Random Percent for Loss: %d \n", randPercent);
 
         int randDupePercent = rand() % 100;
-        if(randDupePercent == 7) {
-            randDupePercent= rand() % 100;
-        }
         printf("Random Percent for Dupe: %d \n", randDupePercent);
     
-
         // Since receive returns the number of bytes written into the buffer, we subtract that from header to get message
         int msgBytes = receive - sizeof(header);
 
@@ -163,16 +145,11 @@ int udp_server() {
             }
 
             // Metric 3: Calculating Throughput  
-            gettimeofday(&tv, NULL);   
-            seconds = tv.tv_sec;
-            ms = tv.tv_usec / 1000000.00;
-            endTime = seconds + ms;
-            double totalTime = endTime - startTime;
+            clock_gettime(CLOCK_MONOTONIC, &end); 
+            double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
             double throughput = (totalBytes * 8.0) / totalTime;
-            printf("Throughput: %.3f \n", throughput);
-
+            printf("Throughput: %.3f bits per sec\n", throughput);
             break;
-
         }
 
         isLost = false;
@@ -182,28 +159,18 @@ int udp_server() {
             packetsLost = true;
             numPacketsLost++;
             strcpy(message, "message is lost");
-
             int newLen = strlen(message);
 
-            // Overwrite the payload portion inside buffer
+            // Modifying the payload with lost message
             memcpy(buffer + sizeof(header), message, newLen);
 
-            // Update total packet size
+            // Updating total packet size
             receive = sizeof(header) + newLen;
-
             isLost = true;
         }
         
 
         // Step 3. Sending the message to the connected socket 
-        /**
-         * sendto
-         * @param: serverfd is the specific file descriptor 
-         * @param buffer is the message containing the msg sent  
-         * @param receieve is the length of bytes written in the buffer. Helps determine how much to send back 
-         * @param client_address is the sockaddr structure in "which the sending address is to be stored"
-         * @param clientLen is length of the supplied sockaddr structure
-        */
         // Echoing packet back to the client
         if (delay > 0) {
             sleep(delay);    
@@ -224,10 +191,10 @@ int udp_server() {
                 exit(EXIT_FAILURE);
             }
             duplicatePackets = true;
-            correctOrder = false;
         }
-        
-        totalBytes = totalBytes + header.bytes_sent;
+        if(!isLost){
+            totalBytes = totalBytes + strlen(message);
+        }
         
         if(header.seq_num != i){
             correctOrder = false;
