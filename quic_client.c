@@ -1,13 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/time.h>
-#include <stdbool.h>
-#include <errno.h>
+#include <stdio.h>      //Standard I/O functions like printf()
+#include <stdlib.h>     //Standard functions like exit()
+#include <string.h>     //String operations like memset() and strlen()
+#include <unistd.h>     //POSIX OS functions like close()
+#include <arpa/inet.h>  //Networking functions like inet_pton(), htons()
+#include <sys/socket.h> //Defines core socket functions and constants.
+#include <netinet/in.h> //Defines Internet address structures.
+#include <sys/time.h> // Allows me to measure time in milliseconds 
+#include <stdbool.h> // Allos me to use booleans 
 
 #define PORT 8080
 #define IP_ADDY "127.0.0.1"

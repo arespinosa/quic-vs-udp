@@ -1,12 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <arpa/inet.h>
-#include <sys/socket.h> 
-#include <netinet/in.h> 
-#include <stdbool.h>
+#include <stdio.h>      //Standard I/O functions like printf()
+#include <stdlib.h>     //Standard functions like exit()
+#include <string.h>     //String operations like memset() and strlen()
+#include <unistd.h>     //POSIX OS functions like close()
+#include <arpa/inet.h>  //Networking functions like inet_pton(), htons()
+#include <sys/socket.h> //Defines core socket functions and constants.
+#include <netinet/in.h> //Defines Internet address structures.
+#include <sys/time.h> // Allows me to measure time in milliseconds 
+#include <stdbool.h> // Allos me to use booleans 
 
 #define PORT 8080       // Port number
 #define IP_ADDY "127.0.0.1" // Local IP Address 
@@ -93,6 +93,7 @@ int udp_client() {
             break;
         }
 
+        // Setting seq num, bytes of message, and starting time
         header.seq_num = i;
         header.bytes_sent = strlen(message);
         clock_gettime(CLOCK_MONOTONIC, &end);
@@ -124,12 +125,13 @@ int udp_client() {
             }
 
             int msgBytes = receive - sizeof(header);
+            // Copying the message echoed message to print 
             memcpy(message, buffer + sizeof(header), msgBytes);
             message[msgBytes] = '\0';
 
             printf("Server: %s\n", message);
             
-            // Measuring the latency of original packet
+            // Measuring the latency of original packet and converting to ms
             if (firstPacket) {
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 latencyList[i] = ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_nsec - start.tv_nsec) / 1e6);
@@ -142,7 +144,7 @@ int udp_client() {
             struct timeval tv = {0, 0};
             fd_set fileDescriptor_Set;
 
-            //Clearing and setting the set after each sequence 
+            //Clearing and setting the socket set after each sequence 
             FD_ZERO(&fileDescriptor_Set);
             FD_SET(sockfd, &fileDescriptor_Set);
 

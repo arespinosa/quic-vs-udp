@@ -120,7 +120,7 @@ int udp_server() {
             printf("------------------------------- \n");
             printf("Anaylsis of Messages Sent \n");
             // Metric 1: Checking if duplicate packets were sent
-            if(duplicatePackets){
+            if(duplicatePackets) {
                 printf("Duplicate Packets were sent \n");
             }
             else{
@@ -128,7 +128,7 @@ int udp_server() {
             }
 
             // Metric 2: Checking if the order of the packets were sent correctly 
-            if(correctOrder){
+            if(correctOrder) {
                 printf("Packets were sent in order \n");
             }
             else {
@@ -154,7 +154,7 @@ int udp_server() {
 
         isLost = false;
         // If current packet is "lost", replacing orig msg
-        if(randPercent < lossPercentage){
+        if(randPercent < lossPercentage) {
             printf("Packet %d lost \n", i);
             packetsLost = true;
             numPacketsLost++;
