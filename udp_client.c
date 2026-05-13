@@ -84,12 +84,12 @@ int udp_client() {
             sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
 
             for(int j = 0; j < i; j++) {
-                printf("Latency for message %d: %.3f \n", (j+1), latencyList[j]);
+                printf("Latency for message %d: %.3f ms\n", (j+1), latencyList[j]);
                 sumLatency += latencyList[j];
             }
-            avgLatency = (double)sumLatency / i;
-            printf("Average Latency: %.3f \n", avgLatency);
 
+            avgLatency = (double)sumLatency / i;
+            printf("Average Latency: %.3f ms\n", avgLatency);
             break;
         }
 
@@ -132,21 +132,16 @@ int udp_client() {
             // Measuring the latency of original packet
             if (firstPacket) {
                 clock_gettime(CLOCK_MONOTONIC, &end);
-                latencyList[i] = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+                latencyList[i] = ((end.tv_sec - start.tv_sec) * 1000.0) + ((end.tv_nsec - start.tv_nsec) / 1e6);
                 i++;
 
                 firstPacket = false;
             }
             
-            /**
-             * If there is a dupe packet, mimicking Dupe Packets with select
-             * @param: sockfd + 1 - Based on instructions, add 1 to fd 
-             * @param: fds - the File Descriptor set 
-             * @param: read - read command is set to null
-             * @param: write - write command is set to null 
-            */
+            //If there is a dupe packet, mimicking Dupe Packets with select
             struct timeval tv = {0, 0};
             fd_set fileDescriptor_Set;
+
             //Clearing and setting the set after each sequence 
             FD_ZERO(&fileDescriptor_Set);
             FD_SET(sockfd, &fileDescriptor_Set);

@@ -12,13 +12,13 @@
 #define PORT 8080
 #define IP_ADDY "127.0.0.1"
 
-
 /**
- * Reliable Mode: Client 
- * Where user will be sending messages to the server 
-*/
+ * Reliable Mode: Client
+ * Where user will be sending messages to the server
+ */
 int quic_client() {
-    struct packet_headers {
+    struct packet_headers
+    {
         bool isAck;
         int seq_num;
         char data[1024];
@@ -28,7 +28,6 @@ int quic_client() {
     double sumLatency = 0.0;
     double avgLatency;
     double latencyList[20];
-
 
     int sockfd;
     struct sockaddr_in server_addr;
@@ -43,22 +42,18 @@ int quic_client() {
     int indefinitely = 1;
     bool packetAcked = false;
 
-    // Create the socket like we usually do 
+    // Create the socket 
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
 
-    // Creating timeval object with 1 second 
+    // Creating timeval object with 1 second
     struct timeval tv;
-    tv.tv_sec = 1;  
+    tv.tv_sec = 1;
     tv.tv_usec = 0;
-    /** int setsockopt - Modifies sockfd to now use timeout
-     * @param: sockfd - Specifying which socket I want to modify with options 
-     * @param SOL_SOCKET - sets the options of timeout at the socket level 
-     * @param SO_RCVTIMEO -  Sets the timeout value that specifies the max amount of time an input function waits until it completes
-    */
+    //setsockopt - Modifies sockfd to now use timeout, with sol_socket setting timeout at socket level w/ 1 second
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     server_addr.sin_family = AF_INET;
@@ -69,38 +64,35 @@ int quic_client() {
         exit(EXIT_FAILURE);
     }
 
-
     while (indefinitely) {
         printf("Enter message you want to send(or type STOP to stop): ");
         fgets(message, sizeof(message), stdin);
 
-        if (strcmp(message, "STOP\n") == 0) { 
+        if (strcmp(message, "STOP\n") == 0) {
             header.seq_num = -1;
 
             // copy header into buffer
             memcpy(buffer, &header, sizeof(header));
 
-            // Sending a packet with -1 for server to compute metrics 
+            // Sending a packet with -1 for server to compute metrics
             size_t packet_size = sizeof(header);
 
             sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&server_addr, addr_len);
-            // Calculating the latency for each packet 
-            for(int j = 0; j < i; j++) {
-                printf("Latency for message %d: %.3f \n", (j+1), latencyList[j]);
+            // Calculating the latency for each packet
+            for (int j = 0; j < i; j++) {
+                printf("Latency for message %d: %.3f ms\n", (j + 1), latencyList[j]);
                 sumLatency += latencyList[j];
             }
             avgLatency = sumLatency / i;
-            printf("Average Latency: %.3f \n", avgLatency);
-            printf("Total Retransmissions: %d", retransmissionCnt);
+            printf("Average Latency: %.3f ms\n", avgLatency);
+            printf("Total Retransmissions: %d \n", retransmissionCnt);
             break;
-
         }
-            
 
         header.seq_num = i;
-        // Copying the message from the user into the header data 
+        // Copying the message from the user into the header data
         strncpy(header.data, message, sizeof(header.data) - 1);
-        // In order for the system to know when to stop, notified by 0 
+        // In order for the system to know when to stop, notified by 0
         header.data[sizeof(header.data) - 1] = '\0';
         header.isAck = false;
         packetAcked = header.isAck;
@@ -110,44 +102,44 @@ int quic_client() {
             clock_gettime(CLOCK_MONOTONIC, &start);
 
             // send packet
-            int msgSend = sendto(sockfd,&header,sizeof(header), 0, (struct sockaddr *)&server_addr, addr_len);
+            int msgSend = sendto(sockfd, &header, sizeof(header), 0, (struct sockaddr *)&server_addr, addr_len);
 
             if (msgSend < 0) {
                 perror("Send Failed");
                 exit(EXIT_FAILURE);
             }
-            // Resetting buffer 
+            // First receieve is to verify ACK
             int msgRec = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
             if (msgRec < 0) {
+                // Rather than exiting with failure, triggering a retransmit
                 printf("Packet %d time out \n", i);
                 printf("Resending Packet %d\n", i);
                 retransmissionCnt++;
                 continue;
             }
-            
+
             memcpy(&response, buffer, sizeof(response));
 
             if (response.isAck && response.seq_num == i) {
                 packetAcked = true;
-                clock_gettime(CLOCK_MONOTONIC, &end);
-                double totalTime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
-                latencyList[i] = totalTime;
+            // Second receive is now the message echoed by the server 
+            int msgRec2 = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
 
-                int msgRec2 = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&server_addr, &addr_len);
+            if (msgRec2 > 0) {
+                memcpy(&response, buffer, sizeof(response));
+                response.data[sizeof(response.data) - 1] = '\0';
+                printf("Server: %s\n", response.data);
+            }
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            double totalTime = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_nsec - start.tv_nsec) / 1e6;
+            latencyList[i] = totalTime;
 
-                if (msgRec2 > 0) {
-                    memcpy(&response, buffer, sizeof(response));
-                    response.data[sizeof(response.data) - 1] = '\0';
-                    printf("Server: %s\n", response.data);
-                }
-
-                continue;
-                
+            continue;
             }
         }
 
         i++;
-        }
+    }
 
     close(sockfd);
     return 0;
